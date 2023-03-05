@@ -2,7 +2,7 @@ const { Telegraf } = require('telegraf')
 const { createZasifer } = require('./commands.js')
 require('dotenv').config()
 
-const bot = new Telegraf(process.env.TELE_BOT_TOKEN);
+const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.catch((err, ctx) => {
   console.log(`Ooops, encountered an error for ${ctx.updateType}`, err)
 })
@@ -11,10 +11,10 @@ bot.start((ctx) => {
   const botInfo = ctx.botInfo
   const chatInfo = ctx.chat
   ctx.replyWithMarkdownV2(
-    "`TELE_BOT_USERNAME=" + botInfo.username +
+    "`BOT_USERNAME=" + botInfo.username +
     "\nTELE_BOT_ID=" + botInfo.id +
-    "\n\nTELE_USERNAME=" + chatInfo.username +
-    "\nTELE_USER_ID=" + chatInfo.id + "`"
+    "\n\nUSERNAME=" + chatInfo.username +
+    "\nUSER_ID=" + chatInfo.id + "`"
   )
 });
 bot.help((ctx) => {
@@ -27,7 +27,7 @@ bot.on('sticker', (ctx) => ctx.reply('👍'));
 
 
 bot.on('text', (ctx) => {
-  if (process.env.TELE_USERNAME === ctx.chat.username || process.env.TELE_USER_ID === ctx.chat.id) {
+  if (process.env.USERNAME === ctx.chat.username || process.env.USER_ID === ctx.chat.id) {
     if (ctx.message.reply_to_message) {
       console.log(ctx.message.reply_to_message);
     } else {
