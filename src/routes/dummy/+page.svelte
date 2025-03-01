@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidate, invalidateAll } from '$app/navigation';
+	import {
+		// invalidate,
+		invalidateAll
+	} from '$app/navigation';
 	import { makeClient } from '$lib/make-client.js';
 	import Button from '@/components/ui/button/button.svelte';
-	import { CircleCheck, Circle } from 'lucide-svelte';
+	import { CheckIcon, UndoIcon, Trash2Icon, PlusIcon } from 'lucide-svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
@@ -38,7 +41,9 @@
 		<Card.Content>
 			<form method="POST" use:enhance class="flex items-center gap-2">
 				<Input type="text" name="name" required bind:value={taskName} disabled={isLoading} />
-				<Button type="submit" class="hover:cursor-pointer" disabled={isLoading}>Add</Button>
+				<Button type="submit" class="hover:cursor-pointer" size="icon" disabled={isLoading}>
+					<PlusIcon aria-hidden="true" />
+				</Button>
 			</form>
 
 			<div class="mt-4 space-y-3">
@@ -47,41 +52,32 @@
 				{:else}
 					{#each data.tasks as task (task.id)}
 						<div class="flex items-center justify-between gap-2">
-							<div class="flex items-center gap-1">
-								<div>
-									{#if task.done}
-										<CircleCheck class="mr-2 size-4" />
-									{:else}
-										<Circle class="mr-2 size-4" />
-									{/if}
-								</div>
-                                {task.name}
-							</div>
+							<span class={task.done ? 'text-gray-500 line-through' : ''}>{task.name}</span>
 							{#if !task.done}
 								<Button
 									type="button"
-									class="hover:cursor-pointer px-3 py-2 h-auto"
+									class="size-5 h-auto text-xs hover:cursor-pointer"
 									onclick={() => handleActionClick(task.id, 'finish')}
 								>
-									Finish
+									<CheckIcon class="size-4" aria-hidden="true" />
 								</Button>
 							{:else}
 								<div class="flex items-center gap-2">
 									<Button
 										type="button"
 										variant="secondary"
-										class="hover:cursor-pointer px-3 py-2 h-auto"
+										class="size-5 h-auto text-xs hover:cursor-pointer"
 										onclick={() => handleActionClick(task.id, 'undo')}
 									>
-										Undo
+										<UndoIcon class="size-4" aria-hidden="true" />
 									</Button>
 									<Button
 										type="button"
 										variant="destructive"
-										class="hover:cursor-pointer px-3 py-2 h-auto"
+										class="size-5 h-auto text-xs hover:cursor-pointer"
 										onclick={() => handleActionClick(task.id, 'delete')}
 									>
-										Delete
+										<Trash2Icon class="size-4" aria-hidden="true" />
 									</Button>
 								</div>
 							{/if}

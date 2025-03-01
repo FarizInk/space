@@ -49,8 +49,16 @@
 	},
 	"dependencies": {
 		"@hono/zod-validator": "^0.4.3",
+		"@types/busboy": "^1.5.4",
+		"@types/content-disposition": "^0.5.8",
+		"@types/node": "^22.13.8",
+		"@types/web": "^0.0.207",
+		"axios": "^1.8.1",
+		"busboy": "^1.6.0",
+		"content-disposition": "^0.5.4",
 		"hono": "^4.7.2",
 		"lucide-svelte": "^0.477.0",
+		"svelte-file-dropzone": "^2.0.9",
 		"zod": "^3.24.2"
 	}
 }
