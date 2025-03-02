@@ -19,7 +19,7 @@ export const router = new Hono()
 	.post('/tasks/:id/undo', zValidator('param', TaskParam), undoTask)
 	.post('/tasks/:id/delete', zValidator('param', TaskParam), deleteTask)
 	.post('/upload', uploadFile)
-	.get('/config', publicConfig)
+	.get('/config', publicConfig);
 
 export const api = new Hono().route('/api', router);
 

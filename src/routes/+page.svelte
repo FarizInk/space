@@ -33,7 +33,7 @@
 	let statuses = $state<('draft' | 'waiting' | 'processing' | 'done' | 'failed')[]>([]);
 	// let uploadeds = $state([]);
 	let onDropzoneDrop = $state<boolean>(false);
-	let maxFileSize = $state<number>(gigaToBytes(2))
+	let maxFileSize = $state<number>(gigaToBytes(2));
 
 	onMount(async () => {
 		theme = localStorage.theme ?? null;

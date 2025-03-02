@@ -32,7 +32,7 @@ export function readableBytes(bytes: number, decimals: number = 2): string {
 
 export const gigaToBytes = (gigaByte: number = 2) => {
 	return gigaByte * 1024 * 1024 * 1024;
-}
+};
 
 export const getMimes = (name: string) => {
 	const extension = name.split('.').pop();
