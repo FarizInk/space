@@ -2,9 +2,17 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<title>Space</title>
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		%sveltekit.head%
+		<script type="text/javascript">
+			document.documentElement.classList.toggle(
+				'dark',
+				localStorage.theme === 'dark' ||
+					(!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+			);
+		</script>
 	</head>
 
 	<body

@@ -1,9 +1,25 @@
 <script lang="ts">
+	import LoadingIcon from '@/components/icons/LoadingIcon.svelte';
 	import Button from '@/components/ui/button/button.svelte';
+	import Label from '@/components/ui/label/label.svelte';
+	import Switch from '@/components/ui/switch/switch.svelte';
+	import * as Tooltip from '@/components/ui/tooltip';
+	import { changeTheme, getMimes, readableBytes } from '@/utils';
 	import axios from 'axios';
-	import { Trash2Icon, UploadIcon } from 'lucide-svelte';
+	import {
+		FolderSearch,
+		MoonStarIcon,
+		SquareDashedMousePointerIcon,
+		Sun,
+		SunMoonIcon,
+		Trash2Icon,
+		UploadIcon
+	} from 'lucide-svelte';
+	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
 
+	let theme = $state<null | 'light' | 'dark'>(null);
+	let autoUpload = $state<boolean>(false);
 	let files = $state<{
 		accepted: File[];
 		rejected: File[];
@@ -12,8 +28,13 @@
 		rejected: []
 	});
 
-	let statuses = $state<('processing' | 'done' | 'waiting' | 'draft')[]>([]);
+	let statuses = $state<('draft' | 'waiting' | 'processing' | 'done' | 'failed')[]>([]);
 	// let uploadeds = $state([]);
+
+	onMount(() => {
+		theme = localStorage.theme ?? null;
+		autoUpload = localStorage.autoUpload === 'false' ? false : true;
+	});
 
 	function handleFilesSelect(e: CustomEvent<{ acceptedFiles: File[]; fileRejections: File[] }>) {
 		const { acceptedFiles, fileRejections } = e.detail;
@@ -21,16 +42,10 @@
 		files.rejected = [...files.rejected, ...fileRejections];
 
 		acceptedFiles.forEach(() => statuses?.push('draft'));
-	}
 
-	function formatBytes(bytes: number, decimals: number = 2): string {
-		if (bytes === 0) return '0 Bytes';
-
-		const k = 1024;
-		const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+		if (autoUpload) {
+			upload();
+		}
 	}
 
 	function removeFile(index: number) {
@@ -40,72 +55,180 @@
 
 	// function checkWaiting() {}
 
-	async function upload() {
-		const index = statuses?.findIndex((status) => status === 'draft');
+	async function upload(queueAll: boolean = true) {
+		if (queueAll) {
+			statuses
+				.filter((status) => status === 'draft')
+				.forEach((status, index) => (statuses[index] = 'waiting'));
+		}
+
+		const index = statuses?.findIndex((status) => status === 'waiting');
 		if (index !== undefined && index >= 0) {
 			const file = files.accepted[index];
-			const { data } = await axios.post(
-				'/api/upload',
-				{ file },
-				{
-					headers: {
-						'Content-Type': 'multipart/form-data',
-						'Content-Disposition': `form-data; name="file"; filename="${file.name}"`
+			statuses[index] = 'processing';
+			try {
+				await axios.post(
+					'/api/upload',
+					{ file },
+					{
+						headers: {
+							'Content-Type': 'multipart/form-data',
+							'Content-Disposition': `form-data; name="file"; filename="${file.name}"`
+						}
 					}
-				}
-			);
+				);
 
-			console.log(data);
+				files.accepted.splice(0, 1);
+				statuses.splice(0, 1);
+			} catch {
+				statuses[index] = 'failed';
+			}
+			upload(false);
 		}
+	}
+
+	function switchTheme() {
+		if (theme === null) {
+			theme = 'light';
+		} else if (theme === 'light') {
+			theme = 'dark';
+		} else if (theme === 'dark') {
+			theme = null;
+		}
+
+		changeTheme(theme);
+	}
+
+	function saveAutoUpload(value: boolean) {
+		localStorage.autoUpload = value;
+		if (value) upload();
+	}
+
+	function cancelQueue(index: number) {
+		console.log(index);
 	}
 </script>
 
-<div class="flex h-screen w-screen flex-col items-center justify-center gap-2 px-3">
-	<Dropzone
-		maxSize={2 * 1024 * 1024 * 1024}
-		on:drop={handleFilesSelect}
-		class="flex aspect-video w-full max-w-[400px] items-center justify-center rounded-xl border border-dashed bg-transparent p-3 hover:cursor-pointer"
-		on:dragenter={() => console.log('enter')}
-		on:dragleave={() => console.log('leave')}
-		on:dragover={() => console.log('over')}
-	>
-		<div class="text-center">
-			Drag and Drop here <br /> or <br />
-			<span
-				class="text-primary decoration-dashed underline-offset-2 hover:cursor-pointer hover:underline"
-			>
-				Browse File
-			</span>
+<div class="flex h-screen w-screen flex-col items-center justify-between gap-2 px-3">
+	<div class="flex w-full items-center justify-center gap-2 py-2">
+		<Tooltip.Provider>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					<Button
+						variant="outline"
+						size="icon"
+						class="rounded-full hover:cursor-pointer"
+						onclick={switchTheme}
+					>
+						{#if theme === 'light'}
+							<Sun aria-hidden="true" />
+						{:else if theme === 'dark'}
+							<MoonStarIcon aria-hidden="true" />
+						{:else}
+							<SunMoonIcon aria-hidden="true" />
+						{/if}
+					</Button>
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					<p>
+						{theme === 'light'
+							? 'Light Mode'
+							: theme === 'dark'
+								? 'Dark Mode'
+								: 'Depends on your system'}
+					</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</Tooltip.Provider>
+		<div class="flex items-center gap-2">
+			<Switch id="auto-upload" bind:checked={autoUpload} onCheckedChange={saveAutoUpload} />
+			<Label for="auto-upload">Auto Upload</Label>
 		</div>
-	</Dropzone>
+	</div>
+	<div class="flex w-full flex-1 flex-col items-center justify-center gap-2">
+		<Dropzone
+			maxSize={2 * 1024 * 1024 * 1024}
+			on:drop={handleFilesSelect}
+			class="flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent"
+			on:dragenter={() => console.log('enter')}
+			on:dragleave={() => console.log('leave')}
+		>
+			<div class="flex flex-wrap items-center gap-2 text-center">
+				<span class="flex items-center gap-1 text-gray-800 dark:text-gray-400">
+					<SquareDashedMousePointerIcon class="size-4" aria-hidden="true" />
+					Drop file here
+				</span>
+				or
+				<span
+					class="text-primary flex items-center gap-1 decoration-dashed underline-offset-2 hover:cursor-pointer hover:underline"
+				>
+					<FolderSearch class="size-4" aria-hidden="true" />
+					Browse File
+				</span>
+			</div>
+			<span class="text-xs text-gray-700 dark:text-gray-500">You can upload file up to 2Gb</span>
+		</Dropzone>
 
-	<div class="w-full max-w-[400px]">
-		<div class="space-y-2">
-			{#each files.accepted as item, index (index)}
-				<div class="flex items-center justify-between gap-2">
-					<div>
-						<div>{item.name}</div>
-						<div class="text-xs text-gray-500">{formatBytes(item.size)}</div>
+		<div class="w-full max-w-[400px]">
+			<div class="space-y-2">
+				{#each files.accepted as item, index (index)}
+					<div class="flex items-center justify-between gap-2">
+						<div class="flex-1 overflow-hidden">
+							<Tooltip.Provider>
+								<Tooltip.Root>
+									<Tooltip.Trigger><p class="truncate">{item.name}</p></Tooltip.Trigger>
+									<Tooltip.Content>
+										<p>{item.name}</p>
+									</Tooltip.Content>
+								</Tooltip.Root>
+							</Tooltip.Provider>
+							<div class="flex items-center justify-between gap-4 text-xs text-gray-500">
+								<div class="flex items-center gap-4">
+									<p class="whitespace-nowrap">{readableBytes(item.size)}</p>
+									<p class="truncate">{getMimes(item.name).shift()}</p>
+								</div>
+								{#if statuses[index] === 'processing'}
+									<div class="text-primary font-bold">100%</div>
+								{/if}
+							</div>
+						</div>
+						<div>
+							{#if statuses[index] === 'draft' || statuses[index] === 'failed'}
+								<Button
+									type="button"
+									variant="destructive"
+									size="icon"
+									class="hover:cursor-pointer"
+									onclick={() => removeFile(index)}
+								>
+									<Trash2Icon aria-hidden="true" />
+								</Button>
+							{:else if statuses[index] === 'waiting'}
+								<Button
+									type="button"
+									variant="secondary"
+									size="icon"
+									class="hover:cursor-pointer"
+									onclick={() => cancelQueue(index)}
+								>
+									<LoadingIcon />
+								</Button>
+							{/if}
+						</div>
 					</div>
-					<div>
-						<Button
-							type="button"
-							variant="destructive"
-							size="icon"
-							class="hover:cursor-pointer"
-							onclick={() => removeFile(index)}
-						>
-							<Trash2Icon aria-hidden="true" />
-						</Button>
-					</div>
-				</div>
-			{/each}
+				{/each}
+			</div>
+			{#if files.accepted.length >= 1 && !autoUpload}
+				<Button
+					type="button"
+					class="mt-3 w-full hover:cursor-pointer"
+					onclick={() => upload()}
+					disabled={statuses.filter((s) => s === 'draft').length === 0}
+				>
+					<UploadIcon aria-hidden="true" />
+					Upload
+				</Button>
+			{/if}
 		</div>
-		{#if files.accepted.length >= 1}
-			<Button type="button" class="mt-3 w-full hover:cursor-pointer" onclick={upload}>
-				<UploadIcon aria-hidden="true" />
-				Upload
-			</Button>
-		{/if}
 	</div>
 </div>

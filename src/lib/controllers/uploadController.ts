@@ -1,67 +1,134 @@
 import { createWriteStream } from 'fs';
-import { pipeline } from 'stream/promises';
-import { parse } from 'content-disposition';
-import { Readable } from 'stream';
+import { Readable, PassThrough } from 'stream';
 import type { ReadableStream } from 'stream/web';
 import type { Context } from 'hono';
+import busboy from 'busboy';
+import sanitize from 'sanitize-filename'; // Optional but recommended
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
 
-const generateResponse = (msg = '', start = performance.now()) => {
-	const time = `Execution time: ${performance.now() - start} ms`;
-	return {
-		msg,
-		time
-	};
-};
+export const uploadFile = async (c: Context): Promise<Response> => {
+	const req = c.req.raw;
+	const contentType = req.headers.get('content-type');
 
-export const uploadFile = async (c: Context) => {
-	const start = performance.now();
-	const body = c.req.raw.body as ReadableStream<Uint8Array>;
-
-	if (!body) {
-		return c.json(generateResponse('No file to upload', start), 400);
+	if (!contentType?.startsWith('multipart/form-data')) {
+		return c.json({ error: 'Content-Type must be multipart/form-data' }, 400);
 	}
 
-	// Check the Content-Length header to validate file size
 	const contentLength = c.req.header('Content-Length');
 	if (!contentLength) {
-		return c.json(generateResponse('Missing Content-Length header', start), 400);
+		return c.json({ error: 'Missing Content-Length header' }, 400);
 	}
 
 	const fileSize = parseInt(contentLength, 10);
 	if (fileSize > MAX_FILE_SIZE) {
-		return c.json(generateResponse('File size exceeds the 2GB limit', start), 413); // 413 Payload Too Large
+		return c.json({ error: 'File size exceeds 2GB limit' }, 413);
 	}
 
-	// Get the filename from the Content-Disposition header
-	const contentDisposition = c.req.header('Content-Disposition');
-	if (!contentDisposition) {
-		return c.json(generateResponse('Missing Content-Disposition header', start), 400);
-	}
+	const headers = new Headers(req.headers);
+	headers.set('Content-Type', contentType);
 
-	const parsed = parse(contentDisposition);
-	const filename = parsed.parameters.filename;
-	if (!filename) {
-		return c.json(generateResponse('Filename not found in Content-Disposition', start), 400);
-	}
+	return new Promise<Response>((resolve) => {
+		let resolved = false;
+		const resolveOnce = (response: Response) => {
+			if (!resolved) {
+				resolved = true;
+				resolve(response);
+			}
+		};
 
-	// Extract the file extension
-	// const fileExtension = filename.split('.').pop(); // Get the part after the last "."
-	// const uniqueFileName = `${Date.now()}.${fileExtension}`;
-	const uniqueFileName = `${Date.now()}_${filename}`;
+		const bb = busboy({ headers: Object.fromEntries(headers.entries()) });
+		let writeStream: ReturnType<typeof createWriteStream> | null = null;
 
-	// Create a writable stream to save the file
-	const fileStream = createWriteStream(`./uploads/${uniqueFileName}`);
+		const nodeStream = Readable.fromWeb(req.body as ReadableStream<Uint8Array>);
+		const tracker = new PassThrough();
 
-	try {
-		const nodeReadableStream = Readable.fromWeb(body);
+		// Handle stream errors
+		nodeStream.on('error', (err) => {
+			console.error('Request stream error:', err);
+			cleanupResources();
+			resolveOnce(c.json({ error: 'Upload aborted by client' }, 400));
+		});
 
-		// Pipe the incoming stream to the file stream
-		await pipeline(nodeReadableStream, fileStream);
-		return c.json(generateResponse('File uploaded successfully!', start), 200);
-	} catch (error) {
-		console.error('Upload failed:', error);
-		return c.json(generateResponse('File upload failed', start), 500);
-	}
+		tracker.on('error', (err) => {
+			console.error('Progress tracker error:', err);
+			cleanupResources();
+			resolveOnce(c.json({ error: 'Upload processing error' }, 500));
+		});
+
+		// Track upload progress
+		let totalBytesRead = 0;
+		let lastLoggedProgress = 0;
+		tracker.on('data', (chunk) => {
+			totalBytesRead += chunk.length;
+			const progress = Math.round((totalBytesRead / fileSize) * 100);
+			if (progress > lastLoggedProgress) {
+				console.info(`Upload progress: ${progress}%`);
+				lastLoggedProgress = progress;
+			}
+		});
+
+		// Handle file upload
+		bb.on('file', (fieldname, file, info) => {
+			const { filename } = info;
+			if (!filename) {
+				cleanupResources();
+				return resolveOnce(c.json({ error: 'No filename provided' }, 400));
+			}
+
+			const safeFilename = sanitize(filename);
+			const savePath = `./uploads/${Date.now()}_${safeFilename}`;
+
+			try {
+				writeStream = createWriteStream(savePath);
+			} catch (err) {
+				console.error('File creation error:', err);
+				return resolveOnce(c.json({ error: 'File creation failed' }, 500));
+			}
+
+			writeStream.on('finish', () => {
+				console.info(`File saved to: ${savePath}`);
+			});
+
+			writeStream.on('error', (err) => {
+				console.error('File write error:', err);
+				cleanupResources();
+				resolveOnce(c.json({ error: 'File write failed' }, 500));
+			});
+
+			file.pipe(writeStream).on('finish', () => {
+				cleanupResources();
+				resolveOnce(c.json({ message: 'File uploaded successfully' }));
+			});
+
+			file.on('error', (err) => {
+				console.error('File stream error:', err);
+				cleanupResources();
+				resolveOnce(c.json({ error: 'File stream error' }, 500));
+			});
+		});
+
+		bb.on('error', (err) => {
+			console.error('Busboy parsing error:', err);
+			cleanupResources();
+			resolveOnce(c.json({ error: 'Upload processing failed' }, 500));
+		});
+
+		bb.on('close', () => {
+			console.info('Upload processing completed');
+		});
+
+		// Cleanup function for resources
+		const cleanupResources = () => {
+			if (writeStream && !writeStream.destroyed) {
+				writeStream.destroy();
+			}
+			if (!nodeStream.destroyed) nodeStream.destroy();
+			if (!tracker.destroyed) tracker.destroy();
+			if (!bb.destroyed) bb.destroy();
+		};
+
+		// Start processing
+		nodeStream.pipe(tracker).pipe(bb);
+	});
 };
