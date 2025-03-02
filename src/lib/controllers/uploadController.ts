@@ -4,8 +4,10 @@ import type { ReadableStream } from 'stream/web';
 import type { Context } from 'hono';
 import busboy from 'busboy';
 import sanitize from 'sanitize-filename'; // Optional but recommended
+import Config from '$lib/config'
+import { gigaToBytes } from '@/utils';
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
+const MAX_FILE_SIZE = gigaToBytes(Config.FILE_SIZE); // 2GB in bytes
 
 export const uploadFile = async (c: Context): Promise<Response> => {
 	const req = c.req.raw;

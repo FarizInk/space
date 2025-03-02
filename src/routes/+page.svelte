@@ -4,7 +4,7 @@
 	import Label from '@/components/ui/label/label.svelte';
 	import Switch from '@/components/ui/switch/switch.svelte';
 	import * as Tooltip from '@/components/ui/tooltip';
-	import { changeTheme, getMimes, readableBytes } from '@/utils';
+	import { changeTheme, getMimes, gigaToBytes, readableBytes } from '@/utils';
 	import axios from 'axios';
 	import {
 		FolderSearch,
@@ -18,6 +18,7 @@
 	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
 	import { toast } from 'svelte-sonner';
+	import { derived } from 'svelte/store';
 
 	let theme = $state<null | 'light' | 'dark'>(null);
 	let autoUpload = $state<boolean>(false);
@@ -32,10 +33,17 @@
 	let statuses = $state<('draft' | 'waiting' | 'processing' | 'done' | 'failed')[]>([]);
 	// let uploadeds = $state([]);
 	let onDropzoneDrop = $state<boolean>(false);
+	let maxFileSize = $state<number>(gigaToBytes(2))
 
-	onMount(() => {
+	onMount(async () => {
 		theme = localStorage.theme ?? null;
 		autoUpload = localStorage.autoUpload === 'false' ? false : true;
+		try {
+			const { data } = await axios.get('/api/config');
+			maxFileSize = gigaToBytes(data.FILE_SIZE);
+		} catch (error) {
+			console.error(error);
+		}
 	});
 
 	function handleFilesSelect(e: CustomEvent<{ acceptedFiles: File[]; fileRejections: File[] }>) {
@@ -149,7 +157,7 @@
 	</div>
 	<div class="flex w-full flex-1 flex-col items-center justify-center gap-2">
 		<Dropzone
-			maxSize={2 * 1024 * 1024 * 1024}
+			maxSize={maxFileSize}
 			on:drop={handleFilesSelect}
 			class="flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent {onDropzoneDrop
 				? 'border-primary shadow-primary/40 shadow-[0px_0px_50px_13px_rgba(0,0,0,1)]'

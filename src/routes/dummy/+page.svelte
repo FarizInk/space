@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import {
-		// invalidate,
-		invalidateAll
-	} from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import { makeClient } from '$lib/make-client.js';
 	import Button from '@/components/ui/button/button.svelte';
 	import { CheckIcon, UndoIcon, Trash2Icon, PlusIcon } from 'lucide-svelte';
@@ -22,7 +19,6 @@
 			await client.tasks[':id'][action].$post({
 				param: { id }
 			});
-			// await invalidate(client.tasks.$url());
 			await invalidateAll();
 		} catch (error) {
 			console.error(error);

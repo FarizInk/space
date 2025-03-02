@@ -58,8 +58,10 @@
 		"busboy": "^1.6.0",
 		"hono": "^4.7.2",
 		"lucide-svelte": "^0.477.0",
+		"pocketbase": "^0.25.2",
 		"sanitize-filename": "^1.6.3",
 		"svelte-file-dropzone": "^2.0.9",
+		"telegram": "^2.26.22",
 		"zod": "^3.24.2"
 	}
 }
