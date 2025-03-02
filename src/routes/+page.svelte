@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LoadingIcon from '@/components/icons/LoadingIcon.svelte';
-	import Button from '@/components/ui/button/button.svelte';
+	import Button, { buttonVariants } from '@/components/ui/button/button.svelte';
 	import Label from '@/components/ui/label/label.svelte';
 	import Switch from '@/components/ui/switch/switch.svelte';
 	import * as Tooltip from '@/components/ui/tooltip';
@@ -17,6 +17,7 @@
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
+	import { toast } from 'svelte-sonner';
 
 	let theme = $state<null | 'light' | 'dark'>(null);
 	let autoUpload = $state<boolean>(false);
@@ -30,6 +31,7 @@
 
 	let statuses = $state<('draft' | 'waiting' | 'processing' | 'done' | 'failed')[]>([]);
 	// let uploadeds = $state([]);
+	let onDropzoneDrop = $state<boolean>(false);
 
 	onMount(() => {
 		theme = localStorage.theme ?? null;
@@ -37,6 +39,7 @@
 	});
 
 	function handleFilesSelect(e: CustomEvent<{ acceptedFiles: File[]; fileRejections: File[] }>) {
+		onDropzoneDrop = false;
 		const { acceptedFiles, fileRejections } = e.detail;
 		files.accepted = [...files.accepted, ...acceptedFiles];
 		files.rejected = [...files.rejected, ...fileRejections];
@@ -72,8 +75,7 @@
 					{ file },
 					{
 						headers: {
-							'Content-Type': 'multipart/form-data',
-							'Content-Disposition': `form-data; name="file"; filename="${file.name}"`
+							'Content-Type': 'multipart/form-data'
 						}
 					}
 				);
@@ -113,21 +115,21 @@
 	<div class="flex w-full items-center justify-center gap-2 py-2">
 		<Tooltip.Provider>
 			<Tooltip.Root>
-				<Tooltip.Trigger>
-					<Button
-						variant="outline"
-						size="icon"
-						class="rounded-full hover:cursor-pointer"
-						onclick={switchTheme}
-					>
-						{#if theme === 'light'}
-							<Sun aria-hidden="true" />
-						{:else if theme === 'dark'}
-							<MoonStarIcon aria-hidden="true" />
-						{:else}
-							<SunMoonIcon aria-hidden="true" />
-						{/if}
-					</Button>
+				<Tooltip.Trigger
+					class={buttonVariants({
+						variant: 'outline',
+						size: 'icon',
+						class: 'hover:cursor-pointer'
+					})}
+					onclick={switchTheme}
+				>
+					{#if theme === 'light'}
+						<Sun aria-hidden="true" />
+					{:else if theme === 'dark'}
+						<MoonStarIcon aria-hidden="true" />
+					{:else}
+						<SunMoonIcon aria-hidden="true" />
+					{/if}
 				</Tooltip.Trigger>
 				<Tooltip.Content>
 					<p>
@@ -149,9 +151,14 @@
 		<Dropzone
 			maxSize={2 * 1024 * 1024 * 1024}
 			on:drop={handleFilesSelect}
-			class="flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent"
-			on:dragenter={() => console.log('enter')}
-			on:dragleave={() => console.log('leave')}
+			class="flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent {onDropzoneDrop
+				? 'border-primary shadow-primary/40 shadow-[0px_0px_50px_13px_rgba(0,0,0,1)]'
+				: 'border-dashed'}"
+			on:dragenter={() => (onDropzoneDrop = true)}
+			on:dragleave={() => (onDropzoneDrop = false)}
+			onclick={() => (onDropzoneDrop = true)}
+			on:filedialogcancel={() => (onDropzoneDrop = false)}
+			on:droprejected={() => toast.error('File Rejected')}
 		>
 			<div class="flex flex-wrap items-center gap-2 text-center">
 				<span class="flex items-center gap-1 text-gray-800 dark:text-gray-400">
