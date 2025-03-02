@@ -18,7 +18,6 @@
 	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
 	import { toast } from 'svelte-sonner';
-	import { derived } from 'svelte/store';
 
 	let theme = $state<null | 'light' | 'dark'>(null);
 	let autoUpload = $state<boolean>(false);
