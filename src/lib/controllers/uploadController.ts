@@ -4,7 +4,7 @@ import type { ReadableStream } from 'stream/web';
 import type { Context } from 'hono';
 import busboy from 'busboy';
 import sanitize from 'sanitize-filename'; // Optional but recommended
-import Config from '$lib/config';
+import Config, { pbClient } from '$lib/config';
 import { gigaToBytes } from '@/utils';
 
 const MAX_FILE_SIZE = gigaToBytes(Config.FILE_SIZE); // 2GB in bytes
@@ -14,17 +14,17 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 	const contentType = req.headers.get('content-type');
 
 	if (!contentType?.startsWith('multipart/form-data')) {
-		return c.json({ error: 'Content-Type must be multipart/form-data' }, 400);
+		return c.json({ message: 'Content-Type must be multipart/form-data' }, 400);
 	}
 
 	const contentLength = c.req.header('Content-Length');
 	if (!contentLength) {
-		return c.json({ error: 'Missing Content-Length header' }, 400);
+		return c.json({ message: 'Missing Content-Length header' }, 400);
 	}
 
 	const fileSize = parseInt(contentLength, 10);
 	if (fileSize > MAX_FILE_SIZE) {
-		return c.json({ error: 'File size exceeds 2GB limit' }, 413);
+		return c.json({ message: 'File size exceeds 2GB limit' }, 413);
 	}
 
 	const headers = new Headers(req.headers);
@@ -49,13 +49,13 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 		nodeStream.on('error', (err) => {
 			console.error('Request stream error:', err);
 			cleanupResources();
-			resolveOnce(c.json({ error: 'Upload aborted by client' }, 400));
+			resolveOnce(c.json({ message: 'Upload aborted by client' }, 400));
 		});
 
 		tracker.on('error', (err) => {
 			console.error('Progress tracker error:', err);
 			cleanupResources();
-			resolveOnce(c.json({ error: 'Upload processing error' }, 500));
+			resolveOnce(c.json({ message: 'Upload processing error' }, 500));
 		});
 
 		// Track upload progress
@@ -75,7 +75,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			const { filename } = info;
 			if (!filename) {
 				cleanupResources();
-				return resolveOnce(c.json({ error: 'No filename provided' }, 400));
+				return resolveOnce(c.json({ message: 'No filename provided' }, 400));
 			}
 
 			const safeFilename = sanitize(filename);
@@ -85,7 +85,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 				writeStream = createWriteStream(savePath);
 			} catch (err) {
 				console.error('File creation error:', err);
-				return resolveOnce(c.json({ error: 'File creation failed' }, 500));
+				return resolveOnce(c.json({ message: 'File creation failed' }, 500));
 			}
 
 			writeStream.on('finish', () => {
@@ -95,7 +95,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			writeStream.on('error', (err) => {
 				console.error('File write error:', err);
 				cleanupResources();
-				resolveOnce(c.json({ error: 'File write failed' }, 500));
+				resolveOnce(c.json({ message: 'File write failed' }, 500));
 			});
 
 			file.pipe(writeStream).on('finish', () => {
@@ -106,14 +106,14 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			file.on('error', (err) => {
 				console.error('File stream error:', err);
 				cleanupResources();
-				resolveOnce(c.json({ error: 'File stream error' }, 500));
+				resolveOnce(c.json({ message: 'File stream error' }, 500));
 			});
 		});
 
 		bb.on('error', (err) => {
 			console.error('Busboy parsing error:', err);
 			cleanupResources();
-			resolveOnce(c.json({ error: 'Upload processing failed' }, 500));
+			resolveOnce(c.json({ message: 'Upload processing failed' }, 500));
 		});
 
 		bb.on('close', () => {
@@ -134,3 +134,12 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 		nodeStream.pipe(tracker).pipe(bb);
 	});
 };
+
+export async function generateLodingTicket(c: Context) {
+	const pb = await pbClient();
+	return c.json({
+		payload: await pb
+			.collection('s_loading_log')
+			.create({ status: 'draft' }),
+	})
+}

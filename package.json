@@ -50,6 +50,7 @@
 		"vitest": "^3.0.0"
 	},
 	"dependencies": {
+		"@hono/node-server": "^1.13.8",
 		"@hono/zod-validator": "^0.4.3",
 		"@types/busboy": "^1.5.4",
 		"@types/node": "^22.13.8",

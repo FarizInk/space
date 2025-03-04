@@ -9,7 +9,7 @@ import {
 	TaskParam,
 	undoTask
 } from './controllers/taskController';
-import { uploadFile } from './controllers/uploadController';
+import { generateLodingTicket, uploadFile } from './controllers/uploadController';
 import { publicConfig } from './config';
 
 export const router = new Hono()
@@ -19,7 +19,8 @@ export const router = new Hono()
 	.post('/tasks/:id/undo', zValidator('param', TaskParam), undoTask)
 	.post('/tasks/:id/delete', zValidator('param', TaskParam), deleteTask)
 	.post('/upload', uploadFile)
-	.get('/config', publicConfig);
+	.get('/config', publicConfig)
+	.get('/ticket', generateLodingTicket);
 
 export const api = new Hono().route('/api', router);
 
