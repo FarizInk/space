@@ -5,7 +5,7 @@ import type { Context } from 'hono';
 import busboy from 'busboy';
 import sanitize from 'sanitize-filename'; // Optional but recommended
 import Config, { pbClient } from '$lib/config';
-import { gigaToBytes } from '@/utils';
+import { getMimes, gigaToBytes } from '@/utils';
 
 const MAX_FILE_SIZE = gigaToBytes(Config.FILE_SIZE); // 2GB in bytes
 
@@ -29,6 +29,21 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 
 	const headers = new Headers(req.headers);
 	headers.set('Content-Type', contentType);
+
+	const pb = await pbClient();
+
+	const record = await pb.collection('s_files').create({
+		"original_name": null,
+		"name": null,
+		"info": {
+			is_cached: false,
+			is_uploaded: false,
+			extension: null,
+			mime: null,
+		},
+		"size": fileSize,
+		"loading_log": null,
+	});
 
 	return new Promise<Response>((resolve) => {
 		let resolved = false;
@@ -71,15 +86,27 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 		});
 
 		// Handle file upload
-		bb.on('file', (fieldname, file, info) => {
+		bb.on('file', async (fieldname, file, info) => {
 			const { filename } = info;
 			if (!filename) {
 				cleanupResources();
 				return resolveOnce(c.json({ message: 'No filename provided' }, 400));
 			}
 
-			const safeFilename = sanitize(filename);
-			const savePath = `./uploads/${Date.now()}_${safeFilename}`;
+			const originalFileName = sanitize(filename);
+			const safeFilename = `${Date.now()}_${originalFileName}`;
+			const savePath = `./uploads/${safeFilename}`;
+			const mimes = getMimes(originalFileName);
+			await pb.collection('s_files').update(record.id, {
+				...record,
+				"original_name": originalFileName,
+				"name": safeFilename,
+				"info": {
+					...record.info,
+					extension: originalFileName.split('.').pop() ?? null,
+					mime: mimes.length >= 1 ? mimes[0] : null
+				}
+			});
 
 			try {
 				writeStream = createWriteStream(savePath);
