@@ -13,11 +13,16 @@
 		Sun,
 		SunMoonIcon,
 		Trash2Icon,
-		UploadIcon
+		UploadIcon,
+		TrashIcon,
+		DownloadIcon,
+		Share2Icon
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
 	import { toast } from 'svelte-sonner';
+	import PocketBase, { type RecordModel } from 'pocketbase';
+	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
 	let theme = $state<null | 'light' | 'dark'>(null);
 	let autoUpload = $state<boolean>(false);
@@ -33,16 +38,20 @@
 	// let uploadeds = $state([]);
 	let onDropzoneDrop = $state<boolean>(false);
 	let maxFileSize = $state<number>(gigaToBytes(2));
+	let pb: null | PocketBase = null;
+	let uploadedFiles = $state<RecordModel[]>([]);
 
 	onMount(async () => {
 		theme = localStorage.theme ?? null;
 		autoUpload = localStorage.autoUpload === 'false' ? false : true;
 		try {
 			const { data } = await axios.get('/api/config');
+			pb = new PocketBase(data.POCKETBASE_URL);
 			maxFileSize = gigaToBytes(data.FILE_SIZE);
 		} catch (error) {
 			console.error(error);
 		}
+		fetchFileFromPB();
 	});
 
 	function handleFilesSelect(e: CustomEvent<{ acceptedFiles: File[]; fileRejections: File[] }>) {
@@ -63,6 +72,18 @@
 		statuses?.splice(index, 1);
 	}
 
+	async function fetchFileFromPB() {
+		const ids = localStorage.getItem('files')?.split(',') ?? [];
+		for (let i = 0; i < ids.length; i++) {
+			try {
+				const record = await pb?.collection('s_files').getOne(ids[i]);
+				if (record) uploadedFiles.push(record);
+			} catch (error) {
+				if (error?.response?.status === 404) localStorage.files = ids.filter((id) => id !== ids[i]);
+			}
+		}
+	}
+
 	// function checkWaiting() {}
 
 	async function upload(queueAll: boolean = true) {
@@ -77,7 +98,7 @@
 			const file = files.accepted[index];
 			statuses[index] = 'processing';
 			try {
-				await axios.post(
+				const { data } = await axios.post(
 					'/api/upload',
 					{ file },
 					{
@@ -89,6 +110,13 @@
 
 				files.accepted.splice(0, 1);
 				statuses.splice(0, 1);
+
+				uploadedFiles.push(data.payload);
+
+				const fileIds = localStorage.getItem('files')?.split(',') ?? [];
+				fileIds.push(data.payload.id);
+				localStorage.files = fileIds;
+				toast.success(data.message);
 			} catch {
 				statuses[index] = 'failed';
 			}
@@ -116,6 +144,12 @@
 	function cancelQueue(index: number) {
 		console.log(index);
 	}
+
+	function openFileInNewTab(index: number) {
+		const file = uploadedFiles[index];
+		const fileName = file.id + (file?.info?.extension ? `.${file.info.extension}` : '');
+		window.open(`/f/${fileName}`, '_blank')?.focus();
+	}
 </script>
 
 <div class="flex h-screen w-screen flex-col items-center justify-between gap-2 px-3">
@@ -126,7 +160,7 @@
 					class={buttonVariants({
 						variant: 'outline',
 						size: 'icon',
-						class: 'hover:cursor-pointer'
+						class: 'rounded-full hover:cursor-pointer'
 					})}
 					onclick={switchTheme}
 				>
@@ -158,7 +192,7 @@
 		<Dropzone
 			maxSize={maxFileSize}
 			on:drop={handleFilesSelect}
-			class="flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent {onDropzoneDrop
+			class="hover:border-primary flex aspect-video w-full max-w-[400px] flex-col items-center justify-center gap-2 rounded-xl border bg-gray-50 p-3 hover:cursor-pointer dark:bg-transparent {onDropzoneDrop
 				? 'border-primary shadow-primary/40 shadow-[0px_0px_50px_13px_rgba(0,0,0,1)]'
 				: 'border-dashed'}"
 			on:dragenter={() => (onDropzoneDrop = true)}
@@ -199,7 +233,7 @@
 							<div class="flex items-center justify-between gap-4 text-xs text-gray-500">
 								<div class="flex items-center gap-4">
 									<p class="whitespace-nowrap">{readableBytes(item.size)}</p>
-									<p class="truncate">{getMimes(item.name).shift()}</p>
+									<p class="truncate">{getMimes(item.name) ?? ''}</p>
 								</div>
 								{#if statuses[index] === 'processing'}
 									<div class="text-primary font-bold">100%</div>
@@ -232,7 +266,7 @@
 					</div>
 				{/each}
 			</div>
-			{#if files.accepted.length >= 1 && !autoUpload}
+			{#if statuses.filter((status) => status === 'draft').length >= 1}
 				<Button
 					type="button"
 					class="mt-3 w-full hover:cursor-pointer"
@@ -242,6 +276,49 @@
 					<UploadIcon aria-hidden="true" />
 					Upload
 				</Button>
+			{/if}
+
+			{#if uploadedFiles.length >= 1}
+				<div class="mt-2 border-t pt-2">
+					<p class="mb-1 text-lg font-bold">Your Files</p>
+					<div class="space-y-2">
+						{#each uploadedFiles as file, index (file.id)}
+							<ContextMenu.Root>
+								<ContextMenu.Trigger>
+									<button
+										type="button"
+										class="hover:border-primary hover:bg-primary/20 group w-full rounded-md border p-2 text-left hover:cursor-pointer"
+										onclick={() => openFileInNewTab(index)}
+									>
+										<div class="group-hover:text-primary truncate font-bold">{file.name}</div>
+										<div
+											class="flex items-center justify-between gap-4 text-xs text-black/50 group-hover:text-black dark:text-white/50 group-hover:dark:text-white"
+										>
+											<p class="truncate">{getMimes(file.name)[0] ?? '-'}</p>
+											<p class="whitespace-nowrap">{readableBytes(file.size, 0)}</p>
+										</div>
+									</button>
+								</ContextMenu.Trigger>
+								<ContextMenu.Content>
+									<ContextMenu.Item class="cursor-pointer gap-1">
+										<DownloadIcon class="size-4" aria-hidden="true" />
+										Download
+									</ContextMenu.Item>
+									<ContextMenu.Item class="cursor-pointer gap-1">
+										<Share2Icon class="size-4" aria-hidden="true" />
+										Share
+									</ContextMenu.Item>
+									<ContextMenu.Item
+										class="cursor-pointer gap-1 text-red-500 data-[highlighted]:bg-red-500/20 data-[highlighted]:text-red-500"
+									>
+										<TrashIcon class="size-4" aria-hidden="true" />
+										Delete
+									</ContextMenu.Item>
+								</ContextMenu.Content>
+							</ContextMenu.Root>
+						{/each}
+					</div>
+				</div>
 			{/if}
 		</div>
 	</div>

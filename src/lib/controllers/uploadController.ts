@@ -5,7 +5,7 @@ import type { Context } from 'hono';
 import busboy from 'busboy';
 import sanitize from 'sanitize-filename'; // Optional but recommended
 import Config, { pbClient } from '$lib/config';
-import { getMimes, gigaToBytes } from '@/utils';
+import { getMimes, gigaToBytes, next24 } from '@/utils';
 
 const MAX_FILE_SIZE = gigaToBytes(Config.FILE_SIZE); // 2GB in bytes
 
@@ -32,18 +32,19 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 
 	const pb = await pbClient();
 
-	const record = await pb.collection('s_files').create({
-		"original_name": null,
-		"name": null,
-		"info": {
+	let record = await pb.collection('s_files').create({
+		original_name: null,
+		name: null,
+		info: {
 			is_cached: false,
 			is_uploaded: false,
 			extension: null,
-			mime: null,
+			mime: null
 		},
-		"size": fileSize,
-		"loading_log": null,
+		size: fileSize,
+		loading_log: null
 	});
+	const logs: Array<string> = [];
 
 	return new Promise<Response>((resolve) => {
 		let resolved = false;
@@ -62,13 +63,13 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 
 		// Handle stream errors
 		nodeStream.on('error', (err) => {
-			console.error('Request stream error:', err);
+			if (Config.DEBUG) console.error('Request stream error:', err);
 			cleanupResources();
 			resolveOnce(c.json({ message: 'Upload aborted by client' }, 400));
 		});
 
 		tracker.on('error', (err) => {
-			console.error('Progress tracker error:', err);
+			if (Config.DEBUG) console.error('Progress tracker error:', err);
 			cleanupResources();
 			resolveOnce(c.json({ message: 'Upload processing error' }, 500));
 		});
@@ -80,7 +81,9 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			totalBytesRead += chunk.length;
 			const progress = Math.round((totalBytesRead / fileSize) * 100);
 			if (progress > lastLoggedProgress) {
-				console.info(`Upload progress: ${progress}%`);
+				const msg = `Upload progress: ${progress}%`;
+				if (Config.DEBUG) console.info(msg);
+				logs.push(msg);
 				lastLoggedProgress = progress;
 			}
 		});
@@ -90,61 +93,77 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			const { filename } = info;
 			if (!filename) {
 				cleanupResources();
+				await pb.collection('s_files').delete(record.id);
 				return resolveOnce(c.json({ message: 'No filename provided' }, 400));
 			}
 
-			const originalFileName = sanitize(filename);
-			const safeFilename = `${Date.now()}_${originalFileName}`;
-			const savePath = `./uploads/${safeFilename}`;
-			const mimes = getMimes(originalFileName);
-			await pb.collection('s_files').update(record.id, {
+			const originalName = sanitize(filename);
+			const extension = originalName.split('.').pop() ?? null;
+			const savePath = `./uploads/${record.id + (extension ? '.' + extension : '')}`;
+			const mimes = getMimes(originalName);
+			record = await pb.collection('s_files').update(record.id, {
 				...record,
-				"original_name": originalFileName,
-				"name": safeFilename,
-				"info": {
+				name: originalName,
+				info: {
 					...record.info,
-					extension: originalFileName.split('.').pop() ?? null,
+					extension,
 					mime: mimes.length >= 1 ? mimes[0] : null
-				}
+				},
+				destroy_at: next24()
 			});
 
 			try {
 				writeStream = createWriteStream(savePath);
 			} catch (err) {
-				console.error('File creation error:', err);
+				if (Config.DEBUG) console.error('File creation error:', err);
+				await pb.collection('s_files').delete(record.id);
 				return resolveOnce(c.json({ message: 'File creation failed' }, 500));
 			}
 
 			writeStream.on('finish', () => {
-				console.info(`File saved to: ${savePath}`);
+				const msg = `File saved to: ${savePath}`;
+				if (Config.DEBUG) console.info(msg);
+				logs.push(msg);
 			});
 
-			writeStream.on('error', (err) => {
-				console.error('File write error:', err);
+			writeStream.on('error', async (err) => {
+				if (Config.DEBUG) console.error('File write error:', err);
 				cleanupResources();
+				await pb.collection('s_files').delete(record.id);
 				resolveOnce(c.json({ message: 'File write failed' }, 500));
 			});
 
-			file.pipe(writeStream).on('finish', () => {
+			file.pipe(writeStream).on('finish', async () => {
 				cleanupResources();
-				resolveOnce(c.json({ message: 'File uploaded successfully' }));
+				const message = 'File uploaded successfully';
+				record = await pb.collection('s_files').update(record.id, {
+					...record,
+					info: {
+						...record.info,
+						is_cached: true
+					},
+					logs
+				});
+				resolveOnce(c.json({ message, payload: record }));
 			});
 
-			file.on('error', (err) => {
-				console.error('File stream error:', err);
+			file.on('error', async (err) => {
+				if (Config.DEBUG) console.error('File stream error:', err);
 				cleanupResources();
+				await pb.collection('s_files').delete(record.id);
 				resolveOnce(c.json({ message: 'File stream error' }, 500));
 			});
 		});
 
-		bb.on('error', (err) => {
-			console.error('Busboy parsing error:', err);
+		bb.on('error', async (err) => {
+			if (Config.DEBUG) console.error('Busboy parsing error:', err);
 			cleanupResources();
+			await pb.collection('s_files').delete(record.id);
 			resolveOnce(c.json({ message: 'Upload processing failed' }, 500));
 		});
 
 		bb.on('close', () => {
-			console.info('Upload processing completed');
+			if (Config.DEBUG) console.info('Upload processing completed');
 		});
 
 		// Cleanup function for resources
@@ -165,8 +184,6 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 export async function generateLodingTicket(c: Context) {
 	const pb = await pbClient();
 	return c.json({
-		payload: await pb
-			.collection('s_loading_log')
-			.create({ status: 'draft' }),
-	})
+		payload: await pb.collection('s_loading_log').create({ status: 'draft' })
+	});
 }
