@@ -9,7 +9,7 @@ import {
 	TaskParam,
 	undoTask
 } from './controllers/taskController';
-import { generateLodingTicket, uploadFile } from './controllers/uploadController';
+import { deleteFile, generateLodingTicket, uploadFile } from './controllers/fileController';
 import { publicConfig } from './config';
 
 export const router = new Hono()
@@ -20,7 +20,8 @@ export const router = new Hono()
 	.post('/tasks/:id/delete', zValidator('param', TaskParam), deleteTask)
 	.post('/upload', uploadFile)
 	.get('/config', publicConfig)
-	.get('/ticket', generateLodingTicket);
+	.get('/ticket', generateLodingTicket)
+	.post('/delete', deleteFile); // NOTE: delete API is only for authenticated user
 
 export const api = new Hono().route('/api', router);
 

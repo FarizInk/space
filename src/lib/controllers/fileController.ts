@@ -32,14 +32,15 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 
 	const pb = await pbClient();
 
-	let record = await pb.collection('s_files').create({
+	let record = await pb.collection('files').create({
 		original_name: null,
 		name: null,
 		info: {
 			is_cached: false,
-			is_uploaded: false,
+			encryption_key: null,
 			extension: null,
-			mime: null
+			mime: null,
+			message_id: null,
 		},
 		size: fileSize,
 		loading_log: null
@@ -93,7 +94,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			const { filename } = info;
 			if (!filename) {
 				cleanupResources();
-				await pb.collection('s_files').delete(record.id);
+				await pb.collection('files').delete(record.id);
 				return resolveOnce(c.json({ message: 'No filename provided' }, 400));
 			}
 
@@ -101,7 +102,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			const extension = originalName.split('.').pop() ?? null;
 			const savePath = `./uploads/${record.id + (extension ? '.' + extension : '')}`;
 			const mimes = getMimes(originalName);
-			record = await pb.collection('s_files').update(record.id, {
+			record = await pb.collection('files').update(record.id, {
 				...record,
 				name: originalName,
 				info: {
@@ -116,7 +117,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 				writeStream = createWriteStream(savePath);
 			} catch (err) {
 				if (Config.DEBUG) console.error('File creation error:', err);
-				await pb.collection('s_files').delete(record.id);
+				await pb.collection('files').delete(record.id);
 				return resolveOnce(c.json({ message: 'File creation failed' }, 500));
 			}
 
@@ -129,14 +130,14 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			writeStream.on('error', async (err) => {
 				if (Config.DEBUG) console.error('File write error:', err);
 				cleanupResources();
-				await pb.collection('s_files').delete(record.id);
+				await pb.collection('files').delete(record.id);
 				resolveOnce(c.json({ message: 'File write failed' }, 500));
 			});
 
 			file.pipe(writeStream).on('finish', async () => {
 				cleanupResources();
 				const message = 'File uploaded successfully';
-				record = await pb.collection('s_files').update(record.id, {
+				record = await pb.collection('files').update(record.id, {
 					...record,
 					info: {
 						...record.info,
@@ -150,7 +151,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 			file.on('error', async (err) => {
 				if (Config.DEBUG) console.error('File stream error:', err);
 				cleanupResources();
-				await pb.collection('s_files').delete(record.id);
+				await pb.collection('files').delete(record.id);
 				resolveOnce(c.json({ message: 'File stream error' }, 500));
 			});
 		});
@@ -158,7 +159,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 		bb.on('error', async (err) => {
 			if (Config.DEBUG) console.error('Busboy parsing error:', err);
 			cleanupResources();
-			await pb.collection('s_files').delete(record.id);
+			await pb.collection('files').delete(record.id);
 			resolveOnce(c.json({ message: 'Upload processing failed' }, 500));
 		});
 
@@ -184,6 +185,13 @@ export const uploadFile = async (c: Context): Promise<Response> => {
 export async function generateLodingTicket(c: Context) {
 	const pb = await pbClient();
 	return c.json({
-		payload: await pb.collection('s_loading_log').create({ status: 'draft' })
+		payload: await pb.collection('logs').create({ status: 'draft', type: 'uploading' })
 	});
+}
+
+// NOTE: delete API is only for authenticated user
+export async function deleteFile(c: Context) {
+	return c.json({
+		foo: 'bar'
+	})
 }

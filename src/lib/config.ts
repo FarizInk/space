@@ -4,7 +4,11 @@ import {
 	POCKETBASE_USERNAME,
 	POCKETBASE_PASSWORD,
 	FILE_SIZE,
-	UPLOAD_PATH
+	UPLOAD_PATH,
+	TELEGRAM_BOT_TOKEN,
+	TELEGRAM_API_ID,
+	TELEGRAM_API_HASH,
+	TELEGRAM_CHAT_ID,
 } from '$env/static/private';
 import type { Context } from 'hono';
 import PocketBase from 'pocketbase';
@@ -16,6 +20,10 @@ interface Config {
 	POCKETBASE_PASSWORD: string;
 	FILE_SIZE: number;
 	UPLOAD_PATH: string;
+	TELEGRAM_BOT_TOKEN: string;
+	TELEGRAM_API_ID: number;
+	TELEGRAM_API_HASH: string;
+	TELEGRAM_CHAT_ID: number;
 }
 
 const config: Config = {
@@ -24,7 +32,11 @@ const config: Config = {
 	POCKETBASE_USERNAME: POCKETBASE_USERNAME ?? '',
 	POCKETBASE_PASSWORD: POCKETBASE_PASSWORD ?? '',
 	FILE_SIZE: FILE_SIZE ? parseFloat(FILE_SIZE) : 2,
-	UPLOAD_PATH: UPLOAD_PATH ?? ''
+	UPLOAD_PATH: UPLOAD_PATH ?? '',
+	TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN ?? '',
+	TELEGRAM_API_ID: TELEGRAM_API_ID ? parseInt(TELEGRAM_API_ID) : 0,
+	TELEGRAM_API_HASH: TELEGRAM_API_HASH ?? '',
+	TELEGRAM_CHAT_ID: TELEGRAM_CHAT_ID ? parseInt(TELEGRAM_CHAT_ID) : 0,
 };
 
 export default config;

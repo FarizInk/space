@@ -21,7 +21,7 @@
 	import { onMount } from 'svelte';
 	import Dropzone from 'svelte-file-dropzone';
 	import { toast } from 'svelte-sonner';
-	import PocketBase, { type RecordModel } from 'pocketbase';
+	import PocketBase, { ClientResponseError, type RecordModel } from 'pocketbase';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
 	let theme = $state<null | 'light' | 'dark'>(null);
@@ -76,10 +76,13 @@
 		const ids = localStorage.getItem('files')?.split(',') ?? [];
 		for (let i = 0; i < ids.length; i++) {
 			try {
-				const record = await pb?.collection('s_files').getOne(ids[i]);
+				const record = await pb?.collection('files').getOne(ids[i]);
 				if (record) uploadedFiles.push(record);
 			} catch (error) {
-				if (error?.response?.status === 404) localStorage.files = ids.filter((id) => id !== ids[i]);
+				const err = error as ClientResponseError; // Type assertion
+				if (err?.response?.status === 404) {
+					localStorage.files = ids.filter((id) => id !== ids[i]);
+				}
 			}
 		}
 	}
