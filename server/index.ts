@@ -1,19 +1,27 @@
 import app from "./app";
-import { z } from "zod";
-
-const ServeEnv = z.object({
-    PORT: z
-        .string()
-        .regex(/^\d+$/, "Port must be a numeric string")
-        .default("3000")
-        .transform(Number),
-});
-const ProcessEnv = ServeEnv.parse(process.env);
+import ENV from "./env";
+import {
+  startTelegramClient,
+  stopTelegramClient,
+} from "./clients/telegram-client";
 
 const server = Bun.serve({
-    port: ProcessEnv.PORT,
-    hostname: "0.0.0.0",
-    fetch: app.fetch,
+  port: ENV.PORT,
+  hostname: "0.0.0.0",
+  fetch: app.fetch,
+});
+console.log("server running", server.port);
+
+// Auto-start the Telegram client when SvelteKit starts
+startTelegramClient().catch(console.error);
+
+// Stop GramJS when the process exits
+process.on("SIGINT", async () => {
+  await stopTelegramClient();
+  process.exit();
 });
 
-console.log("server running", server.port);
+process.on("SIGTERM", async () => {
+  await stopTelegramClient();
+  process.exit();
+});

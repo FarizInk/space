@@ -1,0 +1,35 @@
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: space-pocketbase
+    restart: unless-stopped
+    #command:
+    # - --encryptionEnv #optional
+    # - ENCRYPTION #optional
+    #environment:
+    #ENCRYPTION: example #optional
+    ports:
+      - "${DOCKER_POCKETBASE_PORT}:8090"
+    volumes:
+      - ./pb_data:/pb_data
+      - ./pb_public:/pb_public #optional
+    healthcheck:
+      #optional (recommended) since v0.10.0
+      test: wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  app:
+    container_name: space-universe
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${DOCKER_APP_PORT}:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./tmp:/app/tmp
+    depends_on:
+      pocketbase:
+        condition: service_healthy  # ✅ Waits for `pocketbase` to be ready

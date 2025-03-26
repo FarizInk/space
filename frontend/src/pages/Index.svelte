@@ -4,7 +4,8 @@
 	import Label from '$lib/components/ui/label/label.svelte';
 	import Switch from '$lib/components/ui/switch/switch.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { changeTheme, getMimes, gigaToBytes, readableBytes } from '$lib/utils';
+	import { getMimes, gigaToBytes, readableBytes } from '$root/utils';
+	import { changeTheme } from '$lib/utils';
 	import axios from 'axios';
 	import {
 		FolderSearch,

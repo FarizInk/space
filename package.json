@@ -4,17 +4,30 @@
   "type": "module",
   "scripts": {
     "start": "bun server/index.ts",
-    "dev": "bun --watch server/index.ts"
+    "dev": "bun --watch server/index.ts",
+    "check:lint-format": "bun run check-lint-format.ts",
+    "format": "bun run format.ts"
   },
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "eslint": "^9.23.0",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-prettier": "^5.2.4",
+    "prettier": "^3.5.3"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@types/busboy": "^1.5.4",
+    "busboy": "^1.6.0",
     "hono": "^4.7.5",
+    "pocketbase": "^0.25.2",
+    "sanitize-filename": "^1.6.3",
+    "telegram": "^2.26.22",
     "zod": "^3.24.2"
   }
 }

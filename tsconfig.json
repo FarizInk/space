@@ -24,5 +24,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["server/*"],
+      "@UTILS/*": ["utils/*"],
+    }
   }
 }

@@ -19,7 +19,8 @@
     "baseUrl": ".",
     "paths": {
       "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
+      "$lib/*": ["./src/lib/*"],
+      "$root/*": ["../*"] // Map $root alias to the parent directory
     }
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
