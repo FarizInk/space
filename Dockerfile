@@ -14,6 +14,9 @@ FROM oven/bun AS runtime
 # Set working directory
 WORKDIR /app
 
+# Install Python for node-gyp
+RUN apt update && apt install -y python3 python3-pip
+
 # Copy all files except frontend directory
 COPY . .
 
