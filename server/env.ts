@@ -14,7 +14,6 @@ const ServeEnv = z.object({
   POCKETBASE_PASSWORD: z.string().nullable(),
 
   FILE_SIZE: z.string().default("2").transform(Number),
-  UPLOAD_PATH: z.string().default("uploads"),
 
   TELEGRAM_BOT_TOKEN: z.string().nullable(),
   TELEGRAM_API_ID: z.string().nullable().transform(Number),
