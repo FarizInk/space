@@ -112,7 +112,7 @@ export const uploadFile = async (c: Context): Promise<Response> => {
           extension,
           mime: mimes.length >= 1 ? mimes[0] : null,
         },
-        destroy_at: next24(),
+        expired_at: next24(),
       });
 
       try {

@@ -85,7 +85,7 @@
         "id": "date274419666",
         "max": "",
         "min": "",
-        "name": "destroy_at",
+        "name": "expired_at",
         "presentable": false,
         "required": false,
         "system": false,

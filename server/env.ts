@@ -6,7 +6,10 @@ const ServeEnv = z.object({
     .regex(/^\d+$/, "Port must be a numeric string")
     .default("3000")
     .transform(Number),
-  DEBUG: z.string().default("false").transform(Boolean),
+  DEBUG: z
+    .string()
+    .default("false")
+    .transform(() => process.env.DEBUG === "true"),
 
   PUBLIC_POCKETBASE_URL: z.string().nullable(),
   POCKETBASE_URL: z.string().nullable(),
