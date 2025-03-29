@@ -30,6 +30,8 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./tmp:/app/tmp
+    working_dir: /app
+    entrypoint: ["/bin/sh", "/app/entrypoint.sh"]
     depends_on:
       pocketbase:
         condition: service_healthy  # ✅ Waits for `pocketbase` to be ready

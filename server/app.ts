@@ -96,7 +96,7 @@ const fileRoutes = new Hono().use(
           }
         }
       } catch (error) {
-        if (ENV.DEBUG) console.log(error);
+        if (ENV.DEBUG) console.error(error);
       }
     },
   }),

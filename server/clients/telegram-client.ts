@@ -51,7 +51,7 @@ export async function stopTelegramClient() {
   if (client) {
     await client.disconnect();
     await client.destroy();
-    console.log("Telegram client disconnected!");
+    console.info("Telegram client disconnected!");
     client = null;
   }
 }

@@ -10,7 +10,7 @@ const server = Bun.serve({
   hostname: "0.0.0.0",
   fetch: app.fetch,
 });
-console.log("server running", server.port);
+console.info("server running", server.port);
 
 // Auto-start the Telegram client when SvelteKit starts
 startTelegramClient().catch(console.error);

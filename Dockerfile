@@ -17,6 +17,9 @@ WORKDIR /app
 # Install Python for node-gyp
 RUN apt update && apt install -y python3 python3-pip
 
+# Install cron
+RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+
 # Copy all files except frontend directory
 COPY . .
 
